@@ -3,8 +3,6 @@
   "version": "1.0.0",
   "description": "A simple library for tracking live football World Cup matches and their scores.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
