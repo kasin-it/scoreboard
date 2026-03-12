@@ -2,6 +2,73 @@
 
 A simple library for tracking live football World Cup matches and their scores.
 
+## How it works
+
+The `Scoreboard` is an in-memory store that tracks ongoing football matches. Each match lives on the scoreboard from the moment it starts until it is finished. At any point, you can request a summary of all ongoing matches, sorted by total score (highest first). When two matches have the same total score, the one that started more recently appears first.
+
+## API
+
+### `startMatch(homeTeam: string, awayTeam: string): void`
+
+Adds a new match to the scoreboard with an initial score of 0 - 0. A team cannot participate in more than one match at a time — starting a match with a team that is already playing throws an error.
+
+### `updateScore(homeTeam: string, awayTeam: string, homeScore: number, awayScore: number): void`
+
+Replaces the current score of an ongoing match with the provided absolute values. Scores must be non-negative integers. Scores can decrease (e.g., a VAR correction). Throws an error if the match does not exist.
+
+### `finishMatch(homeTeam: string, awayTeam: string): void`
+
+Removes an ongoing match from the scoreboard. The teams become available to participate in new matches. Throws an error if the match does not exist.
+
+### `getSummary(): { homeTeam: string; awayTeam: string; homeScore: number; awayScore: number }[]`
+
+Returns a snapshot of all ongoing matches, ordered by:
+1. Total score (home + away), highest first
+2. Most recently started first (as a tiebreaker)
+
+The returned array is a snapshot — modifying scores after calling `getSummary` does not affect previously returned results.
+
+## Usage
+
+```typescript
+import { Scoreboard } from "./Scoreboard.js";
+
+const scoreboard = new Scoreboard();
+
+// Start matches — each begins at 0-0
+scoreboard.startMatch("Mexico", "Canada");
+scoreboard.startMatch("Spain", "Brazil");
+scoreboard.startMatch("Germany", "France");
+
+// Update scores with absolute values
+scoreboard.updateScore("Mexico", "Canada", 0, 5);
+scoreboard.updateScore("Spain", "Brazil", 10, 2);
+scoreboard.updateScore("Germany", "France", 2, 2);
+
+// Summary is sorted by total score, then by most recently started
+scoreboard.getSummary();
+// [
+//   { homeTeam: "Spain", awayTeam: "Brazil", homeScore: 10, awayScore: 2 },       // total: 12
+//   { homeTeam: "Mexico", awayTeam: "Canada", homeScore: 0, awayScore: 5 },       // total: 5
+//   { homeTeam: "Germany", awayTeam: "France", homeScore: 2, awayScore: 2 },      // total: 4
+// ]
+
+// Finish a match — removes it from the scoreboard
+scoreboard.finishMatch("Mexico", "Canada");
+
+// The team can now play again
+scoreboard.startMatch("Canada", "France");
+
+// Scores can decrease (e.g., VAR disallows a goal)
+scoreboard.updateScore("Spain", "Brazil", 9, 2);
+
+// Invalid operations throw errors:
+// scoreboard.startMatch("Spain", "Italy");    // Error: Spain is already playing
+// scoreboard.updateScore("USA", "Japan", 1, 0); // Error: match not found
+// scoreboard.updateScore("Spain", "Brazil", -1, 0); // Error: negative score
+// scoreboard.finishMatch("Mexico", "Canada");  // Error: already finished
+```
+
 ## Assumptions
 
 ### 1. Team names are not normalized
@@ -44,3 +111,15 @@ A simple library for tracking live football World Cup matches and their scores.
 - Uses internal sequence number, not timestamp, for deterministic behavior
 
 > **Why?** The requirements say matches with the same total score should be ordered by most recently started first. Using a timestamp (`Date.now()`) would be fragile — two matches started in the same millisecond would have undefined order, and tests would need to mock time. An incrementing sequence number is deterministic, trivial to test, and unambiguously defines insertion order.
+
+## Implementation choices
+
+### Data structures
+
+- **`Map<string, MatchEntry>`** for storing matches — provides O(1) lookup for `updateScore` and `finishMatch` by composite key, instead of O(n) array scan. Each entry bundles the `Match` instance with its sequence number, so match data and ordering metadata stay in sync.
+- **`Set<string>`** for tracking active teams — provides O(1) uniqueness checks in `startMatch`, instead of scanning all matches to see if a team is already playing.
+- **Sort on read** in `getSummary` — O(n log n) per call. We could maintain a sorted structure, but mutations (start/update/finish) are more frequent than reads, and with at most ~16 concurrent World Cup matches, the cost is negligible. Sorting on read keeps the code simpler.
+
+### Composite key strategy
+
+Matches are stored in a `Map` keyed by `JSON.stringify([homeTeam, awayTeam])`. JSON array serialization is collision-free because it escapes any special characters (including quotes and brackets) within each element, so no two distinct team pairings can produce the same key.

@@ -55,6 +55,18 @@ describe("Scoreboard", () => {
 
       expect(scoreboard.getSummary()).toHaveLength(2);
     });
+
+    it("should throw error for empty home team name", () => {
+      expect(() => scoreboard.startMatch("", "Brazil")).toThrow();
+    });
+
+    it("should throw error for empty away team name", () => {
+      expect(() => scoreboard.startMatch("Spain", "")).toThrow();
+    });
+
+    it("should throw error when home and away team are the same", () => {
+      expect(() => scoreboard.startMatch("Spain", "Spain")).toThrow();
+    });
   });
 
   describe("updateScore", () => {
