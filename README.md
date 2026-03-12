@@ -103,7 +103,7 @@ scoreboard.updateScore("Spain", "Brazil", 9, 2);
 
 > **Why?** The requirements specify absolute scores, so each update replaces the previous score entirely. We allow scores to decrease because in real football, VAR can disallow a goal, effectively lowering the score. Restricting to only-increasing scores would make the library unable to handle legitimate corrections. However, negative numbers and decimals are never valid in football, so those are rejected.
 
-> The library assumes consumers respect TypeScript's type signatures. It validates within the number domain (rejects negatives, decimals, NaN) but does not guard against non-number inputs like strings or booleans at runtime.
+> The library assumes consumers respect TypeScript's type signatures. It validates within the number domain (rejects negatives, decimals, NaN) but does not guard against non-number inputs like strings or booleans at runtime. It also assumes scores will fit within JavaScript's safe integer range (`Number.MAX_SAFE_INTEGER`), which is sufficient for any realistic football score.
 
 ### 5. Ordering tiebreaker uses insertion order
 
